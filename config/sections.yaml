@@ -1,0 +1,199 @@
+# Section headings → section type, used for chunking and section filtering.
+# A line is a heading when it matches `heading_line` and its text (minus the colon) matches one of
+# the patterns below (case-insensitive). Headings come from the metadata-only profile of the real notes.
+heading_line: '^\s*([A-Za-z][A-Za-z0-9 /&()\x27\-,.#]{1,60}?)\s*:?\s*$'
+inline_heading: '^\s*(Dx|Tx|HPI|Impression|Plan|Assessment|Medications|Imaging|Labs|FINDINGS|IMPRESSION|TECHNIQUE)\s*:\s*\S'
+
+sections:
+  hpi:
+    - 'HPI'
+    - 'History of Present(ing)? Illness'
+    - 'INITIAL HPI'
+    - 'Interval (History|Events)'
+    - 'Subjective'
+    - 'Chief Complaint'
+    - 'Reason for (Visit|Consult)'
+    - 'Brief Summary of Hospitalization'
+    - 'Hospital Course( by Problem)?'
+    - 'Principal Problem'
+    - 'NEUROLOGY ADMISSION NOTE'
+    - 'Clinical History'
+    - 'History'
+  past_history:
+    - 'Past Medical History'
+    - 'Past History'
+    - 'PMH'
+    - 'Past Surgical History'
+    - 'Family History'
+    - 'Social History'
+    - 'Allergies'
+    - 'Review of Systems'
+  dx_summary:
+    - 'Dx'
+    - 'Diagnosis'
+    - 'Diagnoses'
+    - 'Problem List'
+    - 'Active Neurologic Issue\(?s?\)? & Plan'
+  tx_summary:
+    - 'Tx'
+    - 'Treatment History'
+    - 'Treatments'
+  medications:
+    - 'Medications?'
+    - 'Current medication regimen'
+    - 'Current Medications'
+    - 'Relevant Prior to Admission Medications'
+    - 'Discharge Medications'
+    - 'Home Medications'
+  exam:
+    - 'PHYSICAL EXAM(INATION)?'
+    - 'Neurologic(al)? examination'
+    - 'Exam'
+    - 'Neuro Exam'
+    - 'Mental Status'
+    - 'Cranial Nerves'
+    - 'CNP?'
+    - 'Motor'
+    - 'Sensation'
+    - 'Sensory'
+    - 'Reflexes'
+    - 'Coordination'
+    - 'Gait'
+    - 'Vitals'
+    - 'General'
+  data:
+    - 'DATA ?/ ?RESULTS'
+    - 'DATA & IMAGING'
+    - 'Results'
+    - 'Selected relevant (imaging|laboratory data)'
+    - 'Selected Relevant Labs/Imaging'
+    - 'Imaging'
+    - 'Labs'
+    - 'Laboratory'
+    - 'Lab Results'
+    - 'TB T.?spot'
+    - 'Hep B virus serologies'
+    - 'Serologies'
+  assessment_plan:
+    - 'ASSESSMENT (&|and) PLAN'
+    - 'Assessment'
+    - 'Plan'
+    - 'Impression'
+    - 'Recommendations'
+    - 'A/P'
+    - 'ITEMS FOR FOLLOW ?UP'
+    - 'Follow[- ]?up'
+    - 'Disposition'
+  rad_findings:
+    - 'FINDINGS'
+    - 'Findings by level'
+    - 'CERVICAL SPINE'
+    - 'THORACIC SPINE'
+    - 'LUMBAR SPINE'
+    - 'BRAIN'
+    - 'ORBITS?'
+    - 'COMPARISON'
+  rad_impression:
+    - 'IMPRESSION'
+    - 'CONCLUSION'
+  rad_technique:
+    - 'TECHNIQUE'
+    - 'EXAM(INATION)?'
+    - 'INDICATION'
+    - 'REASON FOR EXAM'
+    - 'HISTORY'
+  path_result:
+    - 'INTERPRETATION'
+    - 'DIAGNOSIS'
+    - 'FINAL PATHOLOGIC DIAGNOSIS'
+    - 'RESULT'
+    - 'RESULTS'
+    - 'CLINICAL HISTORY'
+    - 'SPECIMEN'
+
+# Which sections each field group reads. `always` sections are included whenever present.
+field_group_sections:
+  diagnosis:
+    sections: [hpi, dx_summary, tx_summary, assessment_plan, data]
+    always: [dx_summary, tx_summary]
+  relapse:
+    sections: [hpi, dx_summary, assessment_plan, data, rad_impression, rad_findings]
+    always: [dx_summary, rad_impression]
+  treatment:
+    sections: [hpi, tx_summary, dx_summary, medications, assessment_plan]
+    always: [tx_summary, medications]
+  antibody:
+    sections: [hpi, dx_summary, data, assessment_plan, path_result]
+    always: [dx_summary, data]
+  imaging:
+    sections: [rad_impression, rad_findings, data]
+    always: [rad_impression, rad_findings]
+  demographics:
+    sections: [hpi, past_history, assessment_plan]
+    always: [hpi, past_history]
+  comorbidity:
+    sections: [past_history, dx_summary, hpi, assessment_plan]
+    always: [past_history, dx_summary]
+  # patient messages and outreach notes are short: read them whole (dates of infusions/appointments)
+  followup:
+    whole_note: true
+  # full codebook coverage (16.11.26)
+  admission:
+    sections: [hpi, dx_summary, assessment_plan, data, tx_summary]
+    always: [hpi, dx_summary]
+  admission_course:
+    sections: [hpi, dx_summary, assessment_plan, data, tx_summary]
+    always: [hpi, dx_summary]
+  # hospital names (18.11.26; only on notes that still name hospitals): where admissions happened (history, summaries)
+  # and where the patient is followed (history, plan); the note's opening lines are always included
+  hospital:
+    sections: [hpi, dx_summary, past_history, assessment_plan, tx_summary]
+    always: [hpi, dx_summary, past_history]
+  imaging:
+    sections: [rad_impression, rad_findings, rad_technique, data]
+    always: [rad_impression, rad_findings, rad_technique]
+  imaging_brain:
+    sections: [rad_impression, rad_findings, rad_technique]
+    always: [rad_impression, rad_findings]
+  imaging_spine:
+    sections: [rad_impression, rad_findings, rad_technique]
+    always: [rad_impression, rad_findings]
+  treatment_detail:
+    sections: [hpi, tx_summary, medications, assessment_plan, past_history]
+    always: [tx_summary, medications]
+  labs:
+    sections: [data, assessment_plan, hpi, path_result]
+    always: [data, path_result]
+  ivig:
+    sections: [hpi, tx_summary, medications, assessment_plan]
+    always: [tx_summary, medications]
+  infection:
+    sections: [hpi, assessment_plan, past_history, dx_summary]
+    always: [hpi]
+  background:
+    sections: [hpi, past_history, assessment_plan, dx_summary]
+    always: [hpi, past_history]
+  death:
+    whole_note: true
+  edss_ambulation:
+    sections: [hpi, exam, assessment_plan]
+    always: [exam]
+  edss_vision_brainstem:
+    sections: [hpi, exam, assessment_plan]
+    always: [exam]
+  edss_pyramidal_cerebellar:
+    sections: [hpi, exam, assessment_plan]
+    always: [exam]
+  edss_sensory_bowel_cerebral:
+    sections: [hpi, exam, assessment_plan]
+    always: [exam]
+  vitals:
+    whole_note: true
+  treatment_admin:
+    whole_note: true
+  labs_table:
+    whole_note: true
+  dx_dates:
+    whole_note: true
+  admission_dates:
+    whole_note: true

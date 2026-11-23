@@ -1,0 +1,28 @@
+# Demographics value → REDCap code. Matching is case-insensitive on the trimmed value; regex keys start with "re:".
+# Unmapped values go to review (never guessed).
+sex:
+  Female: "2"
+  F: "2"
+  Male: "1"
+  M: "1"
+race:
+  White: "1"
+  Black: "2"
+  Black or African American: "2"
+  American Indian or Alaska Native: "3"
+  Native American: "3"
+  Asian: "4"
+  Native Hawaiian or Other Pacific Islander: "4"
+  Other: "5"
+ethnicity:
+  Hispanic: "1"
+  Hispanic or Latino: "1"
+  Non Hispanic: "2"
+  Not Hispanic: "2"
+  Not Hispanic or Latino: "2"
+living_deceased:
+  Not reported as deceased: "1"
+  "re:^deceased": "2"
+  "re:^reported deceased": "2"
+# If Date_Of_Death is filled, living_deceased = 2 regardless of Vital_status.
+living_deceased_if_date_of_death: "2"

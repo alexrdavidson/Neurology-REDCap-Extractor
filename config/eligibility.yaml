@@ -1,0 +1,65 @@
+# Step 1 of every patient's review: does this patient have NMOSD?  (clinical team, 10.11.26)
+# DRAFT — needs clinician sign-off. Used by `nmosd reconcile` (the proposal) and the review app (the check).
+#
+# A patient is INCLUDED only when the reviewer confirms both:
+#   1. a documented, confirmed NMOSD diagnosis (not MOGAD or MS; less often autoimmune encephalitis or a
+#      spinal cord infarct), giving most weight to the most recent clinic letters and hospital notes;
+#   2. at least `min_followup_months` of follow-up.
+# AQP4-IgG positivity is usually diagnostic (about 85% of NMOSD patients are AQP4-IgG positive), so the
+# antibody results are shown next to the diagnosis and disagreements are flagged.
+# Until both are confirmed the other instruments stay locked; excluded patients are never exported.
+status: "signed off <Alex> 11.11.26"
+
+# Shown to the reviewer on the diagnosis-check screen.
+criteria:
+  - A documented, confirmed NMOSD diagnosis. Put most weight on the most recent clinic letters and hospital notes.
+  - At least 12 months of follow-up.
+  - Not MOGAD or MS. Less commonly the patient has autoimmune encephalitis or a spinal cord infarct instead.
+  - A positive AQP4-IgG result is usually diagnostic (about 85% of NMOSD patients are AQP4-IgG positive).
+    Seronegative NMOSD is flagged for a closer look, not excluded.
+  - Patients often have several diagnoses (e.g. NMOSD with Sjögren's or lupus). A co-existing diagnosis does
+    not rule out NMOSD; MOGAD, MS, autoimmune encephalitis or a spinal cord infarct instead of NMOSD does.
+  - In a borderline case (any flag below), look at the notes yourself before deciding. Excluding one needs a
+    written reason. If there is not enough information, choose "Not enough information", which excludes the
+    patient.
+
+# Diagnosis categories (codes are stored; labels are shown). Only `nmosd` is included.
+categories:
+  nmosd: NMOSD / NMO (AQP4-IgG positive, or seronegative meeting the criteria)
+  mogad: MOG antibody-associated disease (MOGAD)
+  ms: Multiple sclerosis
+  ae: Autoimmune encephalitis
+  sc_infarct: Spinal cord infarct
+  other: Other diagnosis
+  unclear: Not enough information to decide
+include: [nmosd]
+# Diagnoses that REPLACE NMOSD: they compete with it (latest wins) and a recent one is flagged. Patients often
+# carry several diagnoses, so `other` (e.g. lupus, Sjögren's) may co-exist with NMOSD: it never outranks an
+# NMOSD-spectrum statement and is only listed, unless it is the newest thing the notes say (then flagged).
+alternatives: [mogad, ms, ae, sc_infarct]
+
+# "Put most weight on recent clinic letters and hospital notes": statements in these document classes
+# decide the proposal; other documents (patient messages, radiology indications...) are used only when
+# no clinic letter or hospital note states a diagnosis.
+primary_relevance: [clinical_note]
+# Statements made within this many months of the patient's latest diagnosis statement are "recent"; the
+# proposal is the category stated by the most recent documents in that window.
+recent_window_months: 24
+
+# Follow-up: from the NMOSD diagnosis date (reconciled date_nmo_diagnosis; if missing, the first note that
+# states NMOSD) to the last contact (defined below). Confirmed 10.11.26: counting from diagnosis or from the
+# first MGB visit are both acceptable; diagnosis is used.
+min_followup_months: 12
+# What counts as follow-up (confirmed 10.11.26): clinical notes, including infusion procedure notes, and
+# patient messages, which are part of the patient's treatment. Messages to the patient usually give the date
+# of an infusion or a follow-up appointment; those dates (the `followup` field group) count too.
+followup_end_relevance: [clinical_note, patient_message]
+# Notes of another class that are messages to the patient (e.g. Outreach, classed "low value"), by description.
+followup_message_descriptions: 'OUTREACH|PATIENT EMAIL|MYCHART|PATIENT MESSAGE|TELEPHONE'
+
+# Borderline cases (10.11.26): nothing is ever excluded without a reviewer's decision, and a borderline case
+# needs a written reason before it can be excluded. The reviewer can also look at the other instruments
+# read-only first. A case is borderline when any diagnosis-check flag is raised, the proposal is
+# unclear/other, or follow-up is within this many months of the threshold either way (with 12 and 3: more
+# than 9 and less than 15 months).
+borderline_followup_margin_months: 3

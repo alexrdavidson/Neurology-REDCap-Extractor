@@ -1,0 +1,51 @@
+# Boilerplate blocks stripped before text reaches the LLM (and before copy-forward hashing).
+# Each block starts at a line matching `start` (case-insensitive regex, matched against the whole line)
+# and ends at the first line matching `end` (if given), at the next section heading, or after
+# `max_lines` lines. Lines removed are replaced by a single marker line so offsets stay traceable.
+marker: "[BOILERPLATE REMOVED]"
+blocks:
+  - name: encounter_level_documents
+    start: '^\s*Encounter-Level Documents\b'
+    end: '^\s*$'
+  - name: order_level_documents
+    start: '^\s*Order-Level Documents\b'
+    end: '^\s*$'
+  - name: patient_level_documents
+    start: '^\s*Patient-Level Documents\b'
+    end: '^\s*$'
+  - name: versions
+    start: '^\s*Versions\s*$'
+    end: '^\s*$'
+  - name: billing
+    start: '^\s*(ESTABLISHED|NEW)\s+(HIGH|MOD|LOW)\s+MDM\b.*$'
+    max_lines: 1
+  - name: billing_minutes
+    start: '^\s*(ESTABLISHED|NEW)\b.*\b\d+\s*MIN\s*$'
+    max_lines: 1
+  - name: vitals_table
+    start: '^\s*(BP|Temp|Pulse|Wt|Weight|Resp|SpO2|Height|BMI)\s+Readings? from Last \d+ Encounters?'
+    end: '^\s*$'
+  - name: vitals
+    start: '^\s*Vitals:?\s*$'
+    end: '^\s*$'
+  - name: immunisations
+    start: '^\s*(Immunizations?|Immunisations?|Vaccines?)\s*:?\s*$'
+    end: '^\s*$'
+  - name: immunisation_lines
+    start: '^\s*(TRIVALENT PF|QUADRIVALENT|PCV\s?\d+|PNEUMOVAX|TDAP|ZOSTER|SHINGRIX|COVID-19 VACCINE|INFLUENZA)\b.*$'
+    max_lines: 1
+  - name: contact_options
+    start: '^\s*Contact Options\b'
+    end: '^\s*$'
+  - name: education_provided
+    start: '^\s*Education Provided\b'
+    end: '^\s*$'
+  - name: patient_stated_goal
+    start: '^\s*Patient Stated Goal\b'
+    end: '^\s*$'
+  - name: pt_ot_goals
+    start: '^\s*(PT|OT|Physical Therapy|Occupational Therapy)\s+Goals?\b'
+    end: '^\s*$'
+  - name: confidentiality_banner
+    start: '^\s*\*{3}.*report contains.*$'
+    max_lines: 1

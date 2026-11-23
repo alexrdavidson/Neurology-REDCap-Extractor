@@ -1,0 +1,31 @@
+Neurology REDCap Extractor - START HERE
+=======================================
+
+What it is
+  An app that reads RPDR clinical notes on this computer, can remove patient identifiers, has a local AI model
+  propose REDCap values for patients with a neurological condition, and lets you check every value before export.
+  It opens on a choice of condition. NMOSD is fully set up; other conditions are listed and are added one by one.
+  Nothing is sent over the internet: the AI model runs on this computer.
+
+Set up on Windows (once: about 30-60 minutes, needs internet)
+  1. Before unzipping: right-click the zip file > Properties > tick "Unblock" (if you see it) > OK.
+  2. Unzip it into your Documents folder, e.g.  Documents\Neurology REDCap Extractor
+  3. Double-click "Install Neurology REDCap Extractor". If Windows says "Windows protected your PC", click
+     "More info", then "Run anyway". It installs everything for your user account (about 7 GB:
+     Python packages, the de-identification models, Ollama and the qwen3:8b model) and puts a
+     "Neurology REDCap Extractor" icon on your desktop.
+  4. Anything shown in yellow at the end still needs sorting out: see docs\USER_GUIDE.md,
+     "If something goes wrong".
+
+Set up on a Mac (once)
+  In Terminal, in this folder:
+    python3.11 -m venv .venv && .venv/bin/pip install -e ".[ner,app,window]"
+    .venv/bin/python scripts/make_mac_app.py
+  This makes "Neurology REDCap Extractor.app" in this folder: double-click it, or drag it to the Dock.
+
+Use
+  Double-click the Neurology REDCap Extractor icon. The app opens in its own window. First choose the condition
+  you are working on; then the app takes you through 10 steps. Closing the window closes the app: work running
+  in the background (de-identification, extraction) carries on, and the app shows it when you open it again.
+
+Full guide: docs\USER_GUIDE.md

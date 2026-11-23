@@ -1,0 +1,119 @@
+# De-identification patterns: note-header layouts (per source table class) and generic PHI regexes.
+# Header labels were inferred from masked shapes (BUILD_PLAN §1b) and must be confirmed by the user.
+# Named groups used by the harvester: lastname, firstname, initial, preferred, mrn, dob, age, sex,
+# town, state, zip, account, provider, accession.
+
+header:
+  # Max number of leading non-blank lines examined for a header block.
+  max_lines: 8
+  # The RPDR banner: the first line of a note, starting with "***" (it carries a quoted file name, so it is always
+  # removed). Its wording differs between exports, so only the asterisks are relied on (11.11.26).
+  banner: '^\s*\*{3,}\s*\S.*$'
+  layouts:
+    # Discharge summaries, H&P and progress notes: 4-line fixed-width header.
+    - name: inpatient_4line
+      source_tables: [Discharge_Summaries, HistoryAndPhysical, ProgressNote]
+      lines:
+        - '^\s*(?P<site>[A-Z]{1,4})\s+(?P<unit>.+?)\s{2,}(?P<lastname>[A-Z][A-Za-z\x27\-]+),\s*(?P<firstname>[A-Z][A-Za-z\x27\-]+)(?:\s+(?P<initial>[A-Z])\.?)?\s*$'
+        - '^\s*(?P<age>\d{1,3})\s+Years?\s*(?P<sex>[MF]|Male|Female)?\s*MRN:\s*(?P<mrn>[\d\-]+),?\s*DOB:\s*(?P<dob>\d{1,2}/\d{1,2}/\d{2,4})(?P<rest>.*)$'
+        - '^\s*(?P<town>[A-Z][A-Za-z .\x27\-]+?)\s+(?P<state>[A-Z]{2})\s+(?P<zip>\d{5}(?:-\d{4})?)\s+Account\s*#:\s*(?P<account>\d+)\s*$'
+    # Outpatient visit notes: patient line, provider line, datetime/department line.
+    - name: visit_3line
+      source_tables: [VisitNote]
+      lines:
+        - '^\s*(?P<lastname>[A-Z][A-Za-z\x27\-]+),\s*(?P<firstname>[A-Z][A-Za-z\x27\-]+)(?:\s+(?P<initial>[A-Z])\.?)?(?:\s+[“"](?P<preferred>[^”"]+)[”"])?\s*\((?:MR\s*#|MRN)\s*(?P<mrn>[\d\-]+)\)(?:\s*DOB:\s*(?P<dob>\d{1,2}/\d{1,2}/\d{2,4}))?\s*$'
+        - '^\s*(?P<provider>(?:Dr\.?\s*)?[A-Z][A-Za-z\x27\-]+(?:\s+[A-Z]\.?)?\s+[A-Z][A-Za-z\x27\-]+(?:,\s*(?:MD|DO|NP|PA|PhD|RN)[A-Za-z, .]*)?)\s*$'
+        - '^\s*(?P<datetime>\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}\s*(?:AM|PM))\s+(?P<department>.+?)\s*$'
+    # Real RPDR layouts, fitted to `nmosd header-shapes` on the pilot staging DB (11.11.26; masked shapes only).
+    # Progress notes, H&Ps, discharge summaries and some visit notes, e.g. (fake values):
+    #   MGH Neurology Clinic Doe, Jane
+    #   42 Yrs Old MRN: 1234567, DOB: 3/4/1980, Legal Sex: F
+    #   Boston MA 02114-1234 Acct #: 98765432          (or "... Encounter Date: 5/6/2021")
+    #   ADM: 1/2/2020, D/C: ?                           (optional; or "Encounter Date: 5/6/2021")
+    - name: inpatient_rpdr
+      source_tables: [Discharge_Summaries, HistoryAndPhysical, ProgressNote, VisitNote]
+      lines:
+        - '^\s*(?P<site>[A-Z]{1,8})\s+(?P<unit>\S.*?)\s+(?P<lastname>[A-Z][A-Za-z\x27\-]+),\s*(?P<firstname>[A-Z][A-Za-z\x27\-]+)(?:\s+(?P<initial>[A-Z])\.?|\s+(?P<middle>[A-Z][A-Za-z\x27\-]+))?\s*$'
+        - '^\s*(?:(?P<age>\d{1,3})\b)?[^\r\n]*?\bMRN:\s*(?P<mrn>\d[\d\-]*),?\s*DOB:\s*(?P<dob>\d{1,2}/\d{1,2}/\d{2,4})[^\r\n]*$'
+        - '^\s*(?:(?P<town>[A-Za-z][A-Za-z .\x27\-]*?)\s+(?P<state>[A-Z]{2})\s+(?P<zip>\d{5}(?:-?\d{4})?)\s*|[^\r\n]*?)(?:(?:Acct|Account)\s*#\s*:?\s*(?P<account>\d+)|Encounter\s+Date:\s*\d{1,2}/\d{1,2}/\d{2,4})\s*$'
+        - optional: '^\s*(?:[A-Z]{1,6}:\s*\d{1,2}/\d{1,2}/\d{2,4},?\s*[A-Z]/[A-Z]:\s*(?:\?|\d{1,2}/\d{1,2}/\d{2,4})|Encounter\s+Date:\s*\d{1,2}/\d{1,2}/\d{2,4})\s*$'
+    # Most visit notes, e.g. (fake values):
+    #   Doe, Jane (MR # 1234567) DOB: 3/4/1980 Encounter Date: 5/6/2021   (or a middle name; DOB may be empty)
+    #   Jane Doe Gender: Female DOB:                   (optional; a lone date may come before or instead)
+    #   5/6/2021 10:30 AM Office Visit 5/6/2021
+    #   MRN: 1234567 Provider: Smith, John, MD         (optional)
+    #   CSN: 123456789 Dept: MGH NEURO                 (optional)
+    - name: visit_rpdr
+      source_tables: [VisitNote]
+      lines:
+        - '^\s*(?P<lastname>[A-Z][A-Za-z\x27\-]+),\s*(?P<firstname>[A-Z][A-Za-z\x27\-]+)(?:\s+(?P<initial>[A-Z])\.?|\s+(?P<middle>[A-Z][A-Za-z\x27\-]+))?(?:\s+[“"](?P<preferred>[^”"]+)[”"])?\s*\((?:MR\s*#|MRN)\s*:?\s*(?P<mrn>[\d\-]+)\)(?:\s*DOB:\s*(?P<dob>\d{1,2}/\d{1,2}/\d{2,4})?)?(?:\s*Encounter\s+Date:\s*\d{1,2}/\d{1,2}/\d{2,4})?\s*$'
+        - optional: '^\s*[A-Z][A-Za-z\x27\-.]*(?:\s+[A-Z][A-Za-z\x27\-.]*){0,4}:\s*(?:[A-Za-z]+\s*)?DOB:\s*(?:\d{1,2}/\d{1,2}/\d{2,4})?\s*$'
+        - optional: '^\s*\d{1,2}/\d{1,2}/\d{2,4}\s*$'
+        - optional: '^\s*[A-Z][A-Za-z\x27\-.]*(?:\s+[A-Z][A-Za-z\x27\-.]*){0,4}:\s*(?:[A-Za-z]+\s*)?DOB:\s*(?:\d{1,2}/\d{1,2}/\d{2,4})?\s*$'
+        # date [time] visit type date, e.g. "5/6/2021 10:30 AM Office Visit 5/6/2021" or "5/6/2021 Telephone
+        # 5/6/2021"; optional (one pilot note has none). The closing date keeps a clinical line that merely
+        # starts with a date out of the header.
+        - optional: '^\s*(?P<datetime>\d{1,2}/\d{1,2}/\d{2,4}(?:\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?)\s+(?P<department>[A-Za-z][A-Za-z .&/\-]{0,60}?)\s+\d{1,2}/\d{1,2}/\d{2,4}\s*$'
+        - optional: '^\s*MRN:\s*(?P<mrn>\d[\d\-]*)\b[^\r\n]*$'
+        - optional: '^\s*[A-Z]{2,8}:\s*\d{4,}\b[^\r\n]*$'
+    # Pathology: accession / status / type / lab address.
+    - name: pathology
+      source_tables: [Pathology]
+      lines:
+        - '^\s*Accession\s+Number:\s*(?P<accession>[A-Z]{1,3}\d{2}-\d{3,7})\s+Report\s+Status:\s*(?P<status>.+?)\s*$'
+        - '^\s*Type:\s*(?P<type>.+?)\s*$'
+        - '^\s*(?P<labaddress>\d{1,5}\s+[A-Z][A-Za-z .]+(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Way|Drive|Dr\.?)\b.*)$'
+        - '^\s*(?P<labphone>(?:Phone|Tel|Fax)?:?\s*\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}.*)$'
+    # Radiology: exam title, reason/history, header fields with month-abbreviation dates.
+    - name: radiology
+      source_tables: [Radiology]
+      lines:
+        # The exam title is missing in some pilot reports, which start with "Reason ..." (11.11.26).
+        - optional: '^\s*(?P<exam>(?:MR|MRI|MRA|CT|XR|US)\b.*)$'
+        - '^\s*(?i:REASON|HISTORY|INDICATION|CLINICAL HISTORY)\b[^:\r\n]{0,40}:?\s*(?P<reason>.*)$'
+        - '^\s*(?:Exam Date|Date of Exam|Performed|Ordered|Reported|Date)\s*:\s*(?P<examdate>\d{1,2}[- ][A-Za-z]{3}[- ]\d{2,4}.*)$'
+
+# Generic pattern layer (applied after known identifiers). Order matters.
+patterns:
+  - name: email
+    category: EMAIL
+    regex: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+  - name: url
+    category: URL
+    regex: '\b(?:https?://|www\.)[^\s<>"\x27]*[^\s<>"\x27.,;:)]'
+  - name: ssn
+    category: ID
+    regex: '\b\d{3}-\d{2}-\d{4}\b'
+  - name: phone
+    category: PHONE
+    regex: '(?<!\d)(?:\+?1[-. ]?)?\(?\d{3}\)?[-. ]\d{3}[-. ]\d{4}(?!\d)'
+  - name: phone_compact
+    category: PHONE
+    regex: '(?<![\d/-])(?:\+?1)?\d{3}[-.]\d{4}(?![\d/-])'
+    requires_context: '(?i)\b(phone|tel|cell|mobile|fax|call|pager|contact)\b'
+  - name: accession
+    category: ID
+    regex: '\b[A-Z]{1,3}\d{2}-\d{4,7}\b'
+  - name: mrn_labelled
+    category: ID
+    regex: '(?i)\b(?:MRN|MR\s*#|medical record (?:number|#)|PMRN|EMPI|account\s*#|acct\s*#)\s*:?\s*#?\s*\d[\d\-]{4,}\b'
+  - name: mrn_like
+    category: ID
+    regex: '(?<![\d/.\-:])\d{7,10}(?![\d/.\-:])'
+    requires_context: '(?i)\b(mrn|mr\s*#|record|patient id|account|acct|empi|id)\b'
+  - name: zip_plus4
+    category: LOCATION
+    regex: '\b\d{5}-\d{4}\b'
+  - name: zip_state
+    category: LOCATION
+    regex: '\b(?:MA|NH|RI|CT|VT|ME|NY|NJ|PA|FL|CA|TX)\s+\d{5}\b'
+  - name: street_address
+    category: LOCATION
+    regex: '\b\d{1,5}\s+(?:[A-Z][a-z]+\s){1,3}(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Court|Ct\.?|Way|Place|Pl\.?|Terrace|Circle)\b(?:,?\s*(?:Apt|Unit|#)\s*\w+)?'
+  - name: age_over_89
+    category: AGE
+    regex: '\b(?:9\d|1[0-4]\d)\s*(?:-|\s)?(?:year|yr|y)s?[- ]?(?:old|o)?\b|\b(?:9\d|1[0-4]\d)\s*yo\b|\bage(?:d)?\s+(?:9\d|1[0-4]\d)\b'
+    replacement: '[AGE 90+]'
+
+# Age ≥ 90 replacement token.
+age_cap: 90

@@ -1,0 +1,9 @@
+# Localhost only; no telemetry. `nmosd review` also passes these on the command line.
+[server]
+address = "127.0.0.1"
+headless = true
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false
+serverAddress = "127.0.0.1"

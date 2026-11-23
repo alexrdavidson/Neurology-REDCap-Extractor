@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(../data/**)",
+      "Read(./data/**)",
+      "Read(./outputs/**)",
+      "Read(**/*.accdb)",
+      "Read(**/*.mdb)",
+      "Read(**/*.sqlite)",
+      "Read(**/*.db)",
+      "Read(./config/settings.yaml)",
+      "Read(~/Documents/Private Documents/**)",
+      "Bash(mdb-export:*)",
+      "Bash(sqlite3:*)"
+    ]
+  }
+}

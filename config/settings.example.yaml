@@ -1,0 +1,110 @@
+# Copy to config/settings.yaml (git-ignored) and fill in real paths.
+# Every PHI path must be OUTSIDE this repository; the code refuses to write PHI inside it.
+# Relative paths are resolved against this file's directory's parent (the repo root).
+
+paths:
+  # Identified source export from RPDR (.accdb), or a synthetic .sqlite for testing.
+  source: ../data/SB246_example.accdb
+  # Root PHI working folder (identifiable). Staging, linkage and reports go below it.
+  phi_dir: ../data/work
+  # File listing the pilot EMPIs, one per line (PHI location).
+  empi_list: ../data/work/pilot_empis.txt
+  # User-confirmed identifiers per EMPI (PHI location, never printed).
+  identifiers: ../data/work/identifiers.yaml
+  staging_db: ../data/work/staging/staging.sqlite
+  pilot_selection_db: ../data/work/staging/pilot_selection.sqlite
+  # De-identified output. Must be in a different directory from the linkage key.
+  deid_db: ../data/deid/deid.sqlite
+  # Encrypted linkage key (study ID <-> EMPI/MRN, date offsets, surrogate maps).
+  linkage: ../data/work/linkage/linkage.sqlite.enc
+  deid_report: ../data/work/reports/deid_report.html
+  extract_db: ../data/deid/extract.sqlite
+  # Safe Harbor-style quality packet for an outside check (`nmosd quality-packet`, 16.11.26): outside the repo and
+  # outside the private folder, so Claude may read it and nothing else (CLAUDE.md).
+  quality_packet_dir: ~/Documents/NMOSD quality review
+  review_db: ../data/deid/review.sqlite
+  export_dir: ../data/deid/export
+  reidentified_dir: ../data/work/reidentified
+  # The project's own REDCap data export (CSV, raw codes) whose layout our files must match. It holds PHI:
+  # `export` reads only its header line; `profile-redcap-csv` prints metadata only. Leave empty to use
+  # REDCap's standard column order.
+  redcap_template: null
+
+source:
+  # Date the RPDR export was made (YYYY-MM-DD). Default: parsed from the file name (..._YYYYMMDD_...).
+  export_date: null
+  # Which Report_Status values to keep. P (preliminary) is dropped when a final/revised version exists.
+  keep_status: [F, R, P]
+  drop_preliminary_if_final_exists: true
+  # How "the same report" is recognised when deciding whether a final version exists.
+  version_match_on: [empi, report_number]
+
+deid:
+  # De-identification is optional (13.11.26). false: `nmosd deid` copies the notes as they are (original text,
+  # real dates, under study IDs); no identifiers list, leak test or sign-off is needed.
+  enabled: true
+  date_shift_min_days: 30
+  date_shift_max_days: 365
+  # Tokenise hospital names ([HOSPITAL_01]) or keep them. Ask the PI. Kept (false), or with `enabled: false`, the
+  # `hospital` field group reads hx_opcare, nr_hosp and nr_hosp_2 from the notes; tokenised, the reviewer enters them.
+  tokenise_hospitals: true
+  # MRN-like digit runs (pattern layer)
+  mrn_digit_lengths: [7, 8, 9, 10]
+  ner:
+    enabled: true
+    window_chars: 1800
+    overlap_chars: 300
+    # Recall-biased: a span is PHI if EITHER model flags it above its threshold.
+    models:
+      - name: obi_robust_deid
+        hf_id: obi/deid_roberta_i2b2   # obi/deberta_deid_i2b2_mgb does not exist on the Hub (checked 2026-11-09)
+        fallback_hf_id: obi/deid_bert_i2b2
+        fallback_revision: d2c629e162c16be3a8ccc6e8e4a61405dde93cc2   # pinned 2026-11-10
+        revision: 78f2152eb93ddd817290ce8dbe46f1a6685e09fc   # pinned 2026-11-10
+        threshold: 0.30
+        label_map: obi
+      - name: stanford_aimi
+        hf_id: StanfordAIMI/stanford-deidentifier-v2
+        revision: 244fba67a64894533487fe4031232749c44f6216   # pinned 2026-11-10 (newer -v2, MIT)
+        fallback_hf_id: StanfordAIMI/stanford-deidentifier-base
+        fallback_revision: 661b9c1c717d3165512d440abc3700c386aefab6   # pinned 2026-11-10
+        threshold: 0.30
+        label_map: stanford
+  passphrase_env: NMOSD_LINKAGE_PASSPHRASE
+
+llm:
+  backend: ollama
+  host: http://127.0.0.1:11434
+  model: qwen3:8b
+  allowed_models: [qwen3:8b, gemma3:12b, qwen3:4b, llama3.1:8b, gemma3:4b]
+  # 17.11.26: room for answers of up to 3,072 tokens (long problem lists and lab tables were cut off at 1,024 and
+  # asked again in halves); num_ctx grew by the same 2,048 tokens, so the note excerpts stay the same size.
+  num_ctx: 10240
+  num_predict: 3072
+  # Questions asked at once. Ollama answers them together only with OLLAMA_NUM_PARALLEL set as high (RUNBOOK §7).
+  # 1 = one at a time. Each one needs its own num_ctx of memory in Ollama (4 x 10240 tokens is about 6 GB for qwen3:8b).
+  parallel: 4
+  temperature: 0
+  seed: 42
+  timeout_s: 900
+  retries: 2
+  # Flag a call as possibly truncated when prompt_eval_count < this share of the expected tokens
+  truncation_ratio: 0.5
+
+extraction:
+  chunk_overlap_chars: 400
+  # Leave room for the prompt template + output when chunking.
+  reserve_tokens: 2200
+  skip_relevance: [low_value]
+  relapse_window_days: 30
+  relapse_window_days_low_precision: 120
+
+review:
+  host: 127.0.0.1
+  port: 8501
+
+export:
+  # How dates are written in our REDCap CSVs: YYYY-MM-DD, MM/DD/YYYY, M/D/YYYY, DD/MM/YYYY or D/M/YYYY.
+  # Use the format of the project's own REDCap export (`profile-redcap-csv` prints a suggested setting; the
+  # project export of 10.11.26 writes dates with slashes, month first). YYYY-MM-DD is always read as well.
+  date_format: YYYY-MM-DD

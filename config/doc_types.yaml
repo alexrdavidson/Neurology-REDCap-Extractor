@@ -1,0 +1,46 @@
+# Relevance class per document, from Report_Description / Report_Type (case-insensitive regex).
+# Rules are tried in order; the first match wins. Unmatched documents get `default`.
+# The first letter of Report_Type/Report_Description encodes the hospital site (B, M, F, W, N, S, V);
+# it is stripped before matching when `strip_site_prefix` is true.
+strip_site_prefix: true
+site_letters: [B, M, F, W, N, S, V]
+default: clinical_note
+
+rules:
+  # --- imaging ---
+  - class: neuro_mri
+    source_tables: [Radiology]
+    match: 'MRI?\s*(BRAIN|HEAD|C[- ]?SPINE|CERVICAL|T[- ]?SPINE|THORACIC|L[- ]?SPINE|LUMBAR|TOTAL\s*SPINE|SPINE|FACE|ORBIT|NEURO|MRA)'
+  - class: neuro_mri
+    source_tables: [Radiology]
+    match: '\bMRA\b|\bMR\s+(BRAIN|SPINE|ORBIT|FACE)'
+  - class: low_value
+    source_tables: [Radiology]
+    match: 'X-?RAY|\bXR\b|MAMMO|ULTRASOUND|\bUS\b|\bCT\b|DEXA|FLUORO|ECHO|CHEST|ABDOMEN|PELVIS'
+  - class: low_value
+    source_tables: [Radiology]
+    match: '.*'
+
+  # --- pathology ---
+  - class: flow_cytometry
+    source_tables: [Pathology]
+    match: 'FLOW|CYTOMETRY|CD19|CD20|LYMPHOCYTE SUBSET'
+  - class: low_value
+    source_tables: [Pathology]
+    match: '.*'
+
+  # --- pregnancy / lactation ---
+  - class: pregnancy_related
+    match: 'LACTATION|PERINATAL|OBSTETRIC|\bOB\b|PRENATAL|POSTPARTUM|PREGNAN'
+
+  # --- patient messages ---
+  - class: patient_message
+    match: 'PATIENT EMAIL|MYCHART|PATIENT MESSAGE|TELEPHONE ENCOUNTER|RENEWAL|REFILL'
+
+  # --- nursing and other low-value notes ---
+  - class: low_value
+    match: 'NURS|TRIAGE|PERIOP|OUTREACH|EVENT|SOCIAL WORK|NUTRITION|PHARMACY CONSULT|CASE MANAGEMENT'
+
+  # --- clinical notes ---
+  - class: clinical_note
+    match: 'OFFICE|VISIT|TELEMED|TELEHEALTH|VIDEO|ED PROVIDER|EMERGENCY|H&P|HISTORY AND PHYSICAL|ADMISSION|DISCHARGE|PROGRESS|CONSULT|DOCUMENTATION|PROCEDURE|NEURO'

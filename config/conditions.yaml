@@ -1,0 +1,76 @@
+# The neurological conditions offered on the app's start screen ("Which condition are you working on?").
+#
+#   id         short lower-case name used in file names (letters, digits, _)
+#   name       what the app shows
+#   full_name  shown under the name
+#   group      heading the condition is listed under (groups appear in the order of their first condition)
+#   status     ready   = its REDCap fields, diagnosis check and extraction rules are built: the full guided app opens
+#              planned = listed, not set up yet: the app explains what is needed to set it up
+#   settings   (ready only) this condition's settings file in config/: its own private data folder, so the work
+#              for two conditions never mixes. Git-ignored like every config/settings*.yaml except the example.
+#              Default: settings.<id>.yaml. NMOSD keeps config/settings.yaml, the file it has always used.
+#
+# Not part of the extraction rules: config.rules_hash() leaves this file out.
+
+conditions:
+  # ---------------------------------------------------------------------------------------- Neuroimmunology
+  - id: nmosd
+    name: NMOSD
+    full_name: Neuromyelitis optica spectrum disorder
+    group: Neuroimmunology
+    status: ready
+    settings: settings.yaml
+  - id: mogad
+    name: MOGAD
+    full_name: MOG antibody-associated disease
+    group: Neuroimmunology
+    status: planned
+  - id: ms
+    name: Multiple sclerosis
+    full_name: Relapsing and progressive MS
+    group: Neuroimmunology
+    status: planned
+  - id: myasthenia_gravis
+    name: Myasthenia gravis
+    full_name: AChR, MuSK and seronegative myasthenia gravis
+    group: Neuroimmunology
+    status: planned
+  - id: autoimmune_encephalitis
+    name: Autoimmune encephalitis
+    full_name: Antibody-mediated and seronegative autoimmune encephalitis
+    group: Neuroimmunology
+    status: planned
+
+  # ---------------------------------------------------------------------------------------- General neurology
+  - id: epilepsy
+    name: Epilepsy
+    full_name: Focal and generalised epilepsies
+    group: General neurology
+    status: planned
+  - id: parkinsons
+    name: Parkinson's disease
+    full_name: Parkinson's disease and parkinsonism
+    group: General neurology
+    status: planned
+  - id: als
+    name: ALS / MND
+    full_name: Amyotrophic lateral sclerosis / motor neurone disease
+    group: General neurology
+    status: planned
+  - id: stroke
+    name: Stroke
+    full_name: Ischaemic and haemorrhagic stroke
+    group: General neurology
+    status: planned
+
+  # ---------------------------------------------------------------------------------------- Dementia & headache
+  - id: dementia
+    name: Alzheimer's / dementia
+    full_name: Alzheimer's disease and other dementias
+    group: Dementia & headache
+    status: planned
+  - id: migraine
+    name: Migraine
+    full_name: Episodic and chronic migraine
+    group: Dementia & headache
+    status: planned

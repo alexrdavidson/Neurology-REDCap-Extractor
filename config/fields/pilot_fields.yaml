@@ -1,0 +1,955 @@
+# Pilot extraction specs (REDCap PID 47765). DRAFTED FROM THE CODEBOOK BY CLAUDE —
+# every spec needs clinician sign-off before real runs. Edit freely; codes always refer to REDCap codes.
+version: 1
+missing_codes: [UNK, NA]
+default_status: "draft — needs clinician sign-off"
+
+groups:
+  diagnosis:
+    instrument: demographics
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    focus: 8
+    repeating: false
+    relevance: [clinical_note, patient_message]
+    prefilter_keywords: ['NMO', 'NMOSD', 'neuromyelitis', 'Devic', 'diagnos', 'Dx:', 'MOGAD', 'multiple sclerosis', '\bMS\b',
+                         'optic neuritis', 'myelitis', '\bMOG\b', 'AQP4', 'aquaporin', 'encephalitis', 'infarct']
+    fields:
+      # Not a REDCap field: feeds the diagnosis check that opens every patient's review (config/eligibility.yaml).
+      dx_category:
+        status: "draft — needs clinician sign-off"
+        redcap: false
+        definition: The patient's diagnosis as this note states it NOW, in the treating team's own assessment
+          (nmosd = NMOSD/NMO/Devic's, AQP4-IgG positive or seronegative; mogad = MOG antibody-associated disease;
+          ms = multiple sclerosis; ae = autoimmune encephalitis; sc_infarct = spinal cord infarct; other = another
+          neurological or autoimmune diagnosis, e.g. neurosarcoidosis, lupus, Sjögren's, myasthenia gravis).
+        acceptable_evidence: Assessment or impression lines ("AQP4-IgG positive NMOSD", "consistent with MOGAD,
+          not NMOSD"), Dx summary lines, problem lists, discharge diagnoses.
+        exclusions: Diagnoses only considered, suspected or to be ruled out ("possible NMO", "r/o NMOSD") — report
+          them with hypothetical=true; diagnoses the note says were earlier or wrong (those are otherdx); family
+          history; the reason-for-exam line of an imaging order; unrelated conditions (hypertension, asthma,
+          migraine, vitamin D deficiency).
+        time_window: Any note; the reconciler gives most weight to the most recent clinic letters and hospital notes.
+        ambiguity_rule: Patients often have several diagnoses at once (e.g. NMOSD and Sjögren's); report each as its
+          own item. If the team weighs alternatives (e.g. "MOGAD rather than NMOSD"), report the one it settles on,
+          and report a diagnosis the note says the patient does NOT have with negated=true. If it does not
+          settle, report each with certainty low.
+        estimate_field: null
+        instrument: eligibility
+        repeating: false
+        prefilter_keywords: [NMOSD, '\bNMO\b', MOGAD, '\bMOG\b', multiple sclerosis, '\bMS\b', encephalitis, infarct,
+                             impression, assessment, 'Dx:']
+        preferred_source: notes
+      date_nmo_diagnosis:
+        status: "draft — needs clinician sign-off"
+        definition: Date the treating team first diagnosed NMOSD, not the date of first symptoms. A MOGAD or MS
+          diagnosis date is not an NMOSD diagnosis date.
+        acceptable_evidence: Explicit statements such as "diagnosed with NMOSD in 9/2016", Dx summary lines, the
+          first note documenting the diagnosis together with a positive AQP4/MOG antibody.
+        exclusions: Symptom onset dates; dates a different diagnosis (e.g. MS or MOGAD) was made; "possible NMO" or
+          "rule out NMO".
+        time_window: Any time before the last note.
+        ambiguity_rule: If several dates are given, prefer the earliest explicit diagnosis date and flag the conflict.
+        estimate_field: date_nmo_estimate
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: [diagnos, 'Dx:', NMOSD, MOGAD]
+        preferred_source: notes
+      otherdx:
+        status: "draft — needs clinician sign-off"
+        definition: A diagnosis OTHER than NMOSD that was given to, or seriously considered for, the patient's
+          neurological symptoms at the initial presentation, before NMOSD was diagnosed (1 MS, 2 autoimmune
+          encephalitis, 3 relapsing optic neuritis, 4 other, 5 none), as the user defined it on 16.11.26
+          (alternative diagnoses considered at the initial presentation other than NMO, e.g. MS).
+        acceptable_evidence: '"initially diagnosed with MS", "was thought to have MS and treated with Copaxone",
+          "originally labelled relapsing optic neuritis", "differential at presentation: MS vs NMO", "misdiagnosed
+          as ...". A differential considered at the first presentation counts (report it with hypothetical=false).'
+        exclusions: Comorbidities and other current conditions (migraine, depression, ...); diagnoses considered
+          only after NMOSD was diagnosed; the NMOSD diagnosis itself; MOGAD or MS that the team currently weighs
+          against NMOSD (those belong to dx_category).
+        time_window: The initial presentation, before date_nmo_diagnosis.
+        ambiguity_rule: If none is documented, return not_established (not 5) unless a note states NMOSD was the
+          only diagnosis considered. If several were considered, report each as its own item.
+        estimate_field: null
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: [multiple sclerosis, '\bMS\b', initially, originally, previously, labelled, misdiagnos,
+                             'thought to (?:be|have)', differential, 'at (?:the time of )?presentation']
+        preferred_source: notes
+      dx_other:
+        status: "draft — needs clinician sign-off"
+        definition: Free-text name of the alternative diagnosis when otherdx = 4 (Other).
+        acceptable_evidence: The named diagnosis in the note.
+        exclusions: Leave empty unless otherdx = 4.
+        time_window: Before date_nmo_diagnosis.
+        ambiguity_rule: Use the wording from the note.
+        estimate_field: null
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: [initially, previously, labelled]
+        preferred_source: notes
+
+  relapse:
+    instrument: relapse
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    max_chunk_chars: 9000
+    repeating: true
+    relevance: [clinical_note, neuro_mri, patient_message]
+    prefilter_keywords: [relapse, attack, flare, optic neuritis, myelitis, LETM, area postrema, hiccup, brainstem,
+                         diplopia, vision loss, weakness, numbness, admitted, PLEX, methylprednisolone, IVMP,
+                         'Attacks:', IMPRESSION]
+    # 16.11.26: the attack-detail keys (clinical_confirm, trigger, gad_relapse, let, noncore_phenotype,
+    # firstrelapsestate) are asked in the same call; their codebook label, note and codes are in the schema.
+    guidance: >-
+      Besides the keys defined below, answer for each attack: clinical_confirm (how the attack is documented: an
+      examination at the time vs. a retrospective description), trigger (9 only when the note says there was no
+      trigger, 10 when it says nothing about one), gad_relapse and let (only for an MRI or a myelitis the excerpt
+      describes), noncore_phenotype (only for a non-core syndrome) and firstrelapsestate (only for the patient's
+      first attack: the US state, Canada or another country where it happened). Use not_established for anything
+      the excerpt does not say.
+      PAST ATTACKS: a note often recounts the patient's earlier attacks in one summary (an "Overview", an
+      "Attacks:" line, "per chart review", a letter retelling the history). Give one item for EACH attack it
+      mentions, with that attack's own date as written (a year alone is fine: estimate code 3), even when the note
+      is about something else and the attack happened years before the note.
+    fields:
+      date_onset:
+        status: "draft — needs clinician sign-off"
+        definition: Date of symptom onset of a clinical NMOSD attack (relapse), including the first attack.
+        acceptable_evidence: Dated descriptions of new neurological symptoms attributed to NMOSD; Dx-line attack lists;
+          admission notes giving symptom onset.
+        exclusions: Pseudo-relapses (worsening with infection/heat without new signs); MRI dates; admission dates
+          unless they are the only date given (then estimate code >= 2); planned admissions.
+        time_window: Whole history, including attacks before the first MGB note.
+        ambiguity_rule: The same attack is described many times; give each mention with its own wording, the
+          reconciler merges them. Use the most precise date written.
+        estimate_field: date_attack_estimate
+        instrument: relapse
+        repeating: true
+        prefilter_keywords: [relapse, attack, developed, presented, onset]
+        preferred_source: notes
+      relapse_phenotype:
+        status: "draft — needs clinician sign-off"
+        definition: Clinical syndrome(s) of the attack (checkbox — 1 optic neuritis, 2 transverse myelitis,
+          3 brainstem, 4 area postrema, 5 diencephalic, 6 cerebral, 7 non-core).
+        acceptable_evidence: Clinical description or the treating team's label (ON, TM/LETM, APS).
+        exclusions: MRI-only lesions without matching symptoms.
+        time_window: Same attack.
+        ambiguity_rule: Tick every syndrome documented for the attack.
+        estimate_field: null
+        instrument: relapse
+        repeating: true
+        prefilter_keywords: [optic neuritis, myelitis, LETM, area postrema, hiccups, brainstem, diplopia]
+        preferred_source: notes
+      admission:
+        status: "draft — needs clinician sign-off"
+        definition: Whether the patient was admitted to hospital for this attack (1 yes, 0 no).
+        acceptable_evidence: H&P/discharge summaries; "admitted", "hospitalized"; "treated as an outpatient" for 0.
+        exclusions: ED visits without admission count as 0 only if explicitly discharged from the ED.
+        time_window: Within 30 days after onset.
+        ambiguity_rule: not_established when not documented.
+        estimate_field: null
+        instrument: relapse
+        repeating: true
+        prefilter_keywords: [admitted, admission, hospitalized, discharged, outpatient]
+        preferred_source: notes
+      date_admission:
+        status: "draft — needs clinician sign-off"
+        definition: Admission date for this attack.
+        acceptable_evidence: Admission/discharge documentation.
+        exclusions: Admissions for other reasons.
+        time_window: Within 30 days after onset.
+        ambiguity_rule: Prefer the H&P or discharge summary.
+        estimate_field: null
+        instrument: relapse
+        repeating: true
+        prefilter_keywords: [admitted, admission]
+        preferred_source: notes
+      date_discharge:
+        status: "draft — needs clinician sign-off"
+        definition: Discharge date for this attack's admission.
+        acceptable_evidence: Discharge summaries; "discharged on".
+        exclusions: Discharge to rehab is still the acute discharge date.
+        time_window: After date_admission.
+        ambiguity_rule: Prefer the discharge summary.
+        estimate_field: null
+        instrument: relapse
+        repeating: true
+        prefilter_keywords: [discharged, discharge]
+        preferred_source: notes
+      acute_rx:
+        status: "draft — needs clinician sign-off"
+        definition: Acute treatments given for this attack (checkbox — 1 corticosteroids, 2 PLEX, 3 IVIG,
+          4 cyclophosphamide, 5 other, 6 none).
+        acceptable_evidence: Documented administration (IVMP, prednisone burst, PLEX sessions, IVIG).
+        exclusions: Maintenance therapy; treatments only recommended or planned.
+        time_window: Within 60 days after onset.
+        ambiguity_rule: Tick every treatment given.
+        estimate_field: null
+        instrument: relapse
+        repeating: true
+        prefilter_keywords: [methylprednisolone, IVMP, steroids, prednisone, PLEX, plasma exchange, IVIG]
+        preferred_source: notes
+      mri_relapse:
+        status: "draft — needs clinician sign-off"
+        definition: Was this attack associated with a new T2 lesion on MRI (1 yes, 0 no)?
+        acceptable_evidence: Radiology IMPRESSION/FINDINGS around the attack date; clinician summaries of the MRI.
+        exclusions: Old/unchanged lesions; MRIs more than 60 days from onset.
+        time_window: -14 to +60 days from onset.
+        ambiguity_rule: Prefer the radiology report over clinician paraphrase.
+        estimate_field: null
+        instrument: relapse
+        repeating: true
+        prefilter_keywords: [MRI, T2, lesion, enhancement, hyperintens, IMPRESSION]
+        preferred_source: notes
+
+  treatment:
+    instrument: treatment
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    max_chunk_chars: 9000
+    repeating: true
+    relevance: [clinical_note, patient_message]
+    prefilter_keywords: [rituximab, rituxan, truxima, ruxience, inebilizumab, uplizna, eculizumab, soliris,
+                         ravulizumab, ultomiris, satralizumab, enspryng, tocilizumab, actemra, mycophenolate,
+                         cellcept, '\bMMF\b', azathioprine, imuran, methotrexate, cyclophosphamide, prednisone,
+                         'Tx:', infusion]
+    guidance: >-
+      An infusion or administration record (a nurse's infusion note, an "Administrations This Visit" table, lines
+      such as "Med: ... Dose: ... Frequency: ...") is ONE dose of a drug the patient is on: event = ongoing, dated
+      the day it was given. Use event = start only when the text says it is the first or loading dose, or that the
+      drug was started. Name a drug only when the excerpt names it (generic or brand name): never work out the
+      drug from a dose or a schedule, and never from a sentence about another medicine. "Previously on X", "X was
+      stopped in ...", "switched from X to Y": event = stop for X with the date written (a year or month and year
+      is fine).
+    fields:
+      maintenance_therapy:
+        status: "draft — needs clinician sign-off"
+        definition: Steroid-sparing maintenance immunotherapy (one instance per drug course). Prednisone counts only if
+          planned long-term (>= 6 months). event = start only for the FIRST dose of a course; each later infusion or
+          dose of a drug the patient is already on (e.g. every 8 weeks for ravulizumab, every 6 months for
+          rituximab) is ongoing, not a new start.
+        acceptable_evidence: Infusion records, "started X on", Tx summary lines, medication lists with start dates.
+        exclusions: A plan, recommendation, prescription, insurance request or discussion is NOT a start.
+          Acute steroid tapers are not maintenance.
+        time_window: Whole history.
+        ambiguity_rule: Report every start/stop/ongoing/planned mention with the event type; the reconciler builds
+          episodes.
+        estimate_field: null
+        instrument: treatment
+        repeating: true
+        prefilter_keywords: [started, start, began, infusion, since, stopped, discontinued, switched]
+        preferred_source: notes
+      date_starting_maint:
+        status: "draft — needs clinician sign-off"
+        definition: Date the drug was first actually given/taken (first infusion or first dose).
+        acceptable_evidence: '"first rituximab infusion given on", "started azathioprine on", Tx lines "since 4/2018".'
+        exclusions: '"Plan to start", "will start", "prior authorization submitted", prescription dates.'
+        time_window: Whole history.
+        ambiguity_rule: Prefer infusion/procedure notes; then the most precise date written.
+        estimate_field: date_maintenance_estimate
+        instrument: treatment
+        repeating: true
+        prefilter_keywords: [started, first infusion, since, began]
+        preferred_source: notes
+      still_on_therapy:
+        status: "draft — needs clinician sign-off"
+        definition: Is the patient still on this drug and dose at the last available note (1 yes, 0 no)?
+        acceptable_evidence: Latest note's medication list or plan ("continue X").
+        exclusions: Historical mentions.
+        time_window: Latest note.
+        ambiguity_rule: Derived by the reconciler from the latest evidence.
+        estimate_field: null
+        instrument: treatment
+        repeating: true
+        prefilter_keywords: [continue, currently on, remains on]
+        preferred_source: notes
+      date_stopping_maint:
+        status: "draft — needs clinician sign-off"
+        definition: Date the drug was stopped (or dose changed). For rituximab and other long-acting drugs, the date of
+          the last infusion.
+        acceptable_evidence: '"stopped on", "last infusion", Tx lines "4/2018-1/2022".'
+        exclusions: Temporary holds unless the course ended.
+        time_window: After the start date.
+        ambiguity_rule: Use the most precise date written.
+        estimate_field: date_stopping_estimate
+        instrument: treatment
+        repeating: true
+        prefilter_keywords: [stopped, discontinued, last infusion, switched]
+        preferred_source: notes
+      reason_for_stopping_tx:
+        status: "draft — needs clinician sign-off"
+        definition: Reason for stopping (1 relapse, 2 side effects/toxicity, 3 stopping all therapy, 4 convenience,
+          5 changing dose, 6 loss to follow-up/self-discontinuation, 7 other).
+        acceptable_evidence: Stated reason near the stop.
+        exclusions: Speculation.
+        time_window: Around the stop date.
+        ambiguity_rule: If several, choose the one the treating team gives as primary.
+        estimate_field: null
+        instrument: treatment
+        repeating: true
+        prefilter_keywords: [because, due to, after, relapse, side effect, hypogammaglobulinemia, insurance, convenience]
+        preferred_source: notes
+
+  antibody:
+    instrument: antibody_lab_data
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    focus: 6
+    repeating: true
+    relevance: [clinical_note, flow_cytometry, patient_message]
+    prefilter_keywords: [AQP4, aquaporin, NMO-IgG, MOG, antibody, seropositive, seronegative, cell-based, Mayo, ARUP]
+    guidance: >-
+      One item per test RESULT. A negative result is a result: report "MOG negative" or "AQP4-IgG negative" too.
+      Give the titre (e.g. 1:100), the assay (cell-based, FACS, ELISA) and the laboratory when the excerpt gives
+      them. The date is the day the sample was drawn: a result table's own date, or the note's date when it says
+      the test was sent or drawn today. When the excerpt only repeats an old result without saying when it was
+      drawn, leave the date not_established; do not use a date that stands next to another result.
+    fields:
+      type_test:
+        status: "draft — needs clinician sign-off"
+        definition: Which antibody was tested (codes 'aqp4' or 'mog').
+        acceptable_evidence: Lab results quoted in notes ("AQP4-IgG positive by cell-based assay on ...").
+        exclusions: Antibodies only planned or pending.
+        time_window: Whole history.
+        ambiguity_rule: One instance per distinct test date and antibody.
+        estimate_field: null
+        instrument: antibody_lab_data
+        repeating: true
+        prefilter_keywords: [AQP4, aquaporin, MOG]
+        preferred_source: notes
+      aqp4_assay_date:
+        status: "draft — needs clinician sign-off"
+        definition: Date the serum AQP4 test was drawn (serum only, not CSF).
+        acceptable_evidence: Dated AQP4 results.
+        exclusions: CSF AQP4; dates the result was discussed.
+        time_window: Whole history.
+        ambiguity_rule: If only month/year is written, give the 15th and estimate code 2.
+        estimate_field: null
+        instrument: antibody_lab_data
+        repeating: true
+        prefilter_keywords: [AQP4, aquaporin, NMO-IgG]
+        preferred_source: notes
+      aqp4_assay_status:
+        status: "draft — needs clinician sign-off"
+        definition: AQP4 result (1 positive, 2 negative).
+        acceptable_evidence: The quoted result.
+        exclusions: '"pending", "sent".'
+        time_window: Same test.
+        ambiguity_rule: not_established if the result is not given.
+        estimate_field: null
+        instrument: antibody_lab_data
+        repeating: true
+        prefilter_keywords: [positive, negative, seropositive, seronegative]
+        preferred_source: notes
+      mog_assay_date:
+        status: "draft — needs clinician sign-off"
+        definition: Date the MOG test was drawn.
+        acceptable_evidence: Dated MOG results.
+        exclusions: Dates the result was discussed.
+        time_window: Whole history.
+        ambiguity_rule: If only month/year is written, give the 15th and estimate code 2.
+        estimate_field: date_mog_estimate
+        instrument: antibody_lab_data
+        repeating: true
+        prefilter_keywords: [MOG]
+        preferred_source: notes
+      mog_test_positive:
+        status: "draft — needs clinician sign-off"
+        definition: MOG result (1 yes = positive, including screen-positive; 0 no).
+        acceptable_evidence: The quoted result.
+        exclusions: '"pending", "sent".'
+        time_window: Same test.
+        ambiguity_rule: not_established if the result is not given.
+        estimate_field: null
+        instrument: antibody_lab_data
+        repeating: true
+        prefilter_keywords: [positive, negative]
+        preferred_source: notes
+
+  # Follow-up contacts (10.11.26): messages to the patient usually give the date of an infusion or a follow-up
+  # appointment. Those dates count as follow-up for the diagnosis check (config/eligibility.yaml). Not REDCap
+  # fields. Outreach notes are "low value" by class, so they are selected by their description instead.
+  followup:
+    instrument: eligibility
+    repeating: false
+    relevance: [patient_message]
+    include_descriptions: 'OUTREACH|PATIENT EMAIL|MYCHART|PATIENT MESSAGE|TELEPHONE'
+    prefilter_keywords: [appointment, scheduled, schedule, infusion, injection, follow-up, follow up, reminder,
+                         'see you', visit]
+    fields:
+      visit_date:
+        status: "draft — needs clinician sign-off"
+        redcap: false
+        definition: Date of an infusion, injection, clinic appointment, MRI or blood test that the message
+          schedules, confirms or reminds the patient about.
+        acceptable_evidence: '"Your next rituximab infusion is scheduled for 3/14/2025", "Reminder: follow-up
+          appointment on 4/2/2025", "We have booked your MRI for May 6".'
+        exclusions: Dates of past events mentioned in passing (symptom onset, an earlier relapse); medication refill
+          dates; appointments the message says were cancelled (report them with negated=true).
+        time_window: Any message.
+        ambiguity_rule: One item per date. A tentative date ("we will try for early May") is hypothetical=true.
+        estimate_field: null
+        instrument: eligibility
+        repeating: false
+        prefilter_keywords: [scheduled, appointment, infusion, booked, reminder]
+        preferred_source: notes
+      visit_type:
+        status: "draft — needs clinician sign-off"
+        redcap: false
+        definition: What the date is for (infusion = infusion or injection of a treatment; appointment = clinic or
+          video visit; test = MRI, blood test or other investigation; other).
+        acceptable_evidence: The wording next to the date.
+        exclusions: None.
+        time_window: Same date.
+        ambiguity_rule: other when unclear.
+        estimate_field: null
+        instrument: eligibility
+        repeating: false
+        prefilter_keywords: []
+        preferred_source: notes
+
+  # Comorbidities (13.11.26, from first-draft review feedback: diagnoses in the medical history were missed).
+  # Each condition the notes list is one item with its REDCap category; the reconciler ticks the categories
+  # and shows every named condition to the reviewer, including those outside the REDCap categories.
+  comorbidity:
+    instrument: demographics
+    repeating: false
+    relevance: [clinical_note]
+    # 17.11.26: a line of a problem list or history already read in an earlier note of the patient is not read again
+    skip_repeated_lines: true
+    prefilter_keywords: ['past medical history', '\bPMH\b', 'problem list', 'medical history', 'history of', '\bh/o\b',
+                         'comorbid']
+    fields:
+      comorbidities:
+        status: "draft — needs clinician sign-off"
+        definition: A condition the patient has, from the medical history, problem list or diagnosis list, with its
+          REDCap category. Report EVERY condition of a list, one item per line, even a long problem list (lines
+          such as "Migraine G43.909 3/2/2015" give the name, an ICD-10 code and a date; report the name only). Its
+          REDCap category (1 autoimmune disease; 2 psychiatric disorders such as anxiety, depression, PTSD, bipolar
+          disorder, mania or psychosis; 3 neurologic disorders such as migraine, epilepsy or neuropathy;
+          4 vascular risk factors such as hypertension, type 2 or unspecified diabetes or hyperlipidemia;
+          5 coronary artery or ischemic heart disease; 6 COPD or asthma; 7 chronic kidney disease; 8 cancer;
+          9 none). Report every condition, one item each, with its name in `condition`. A condition outside
+          categories 1-8 (e.g. osteopenia, diverticulosis, GERD, vitamin D deficiency) is no_category.
+        acceptable_evidence: Past Medical History lists, problem lists, diagnosis lists, "history of X",
+          "known X" in the HPI or assessment.
+        exclusions: NMOSD itself and its attacks or after-effects (optic neuritis, transverse myelitis, spasticity,
+          neurogenic bladder, neuropathic pain from myelitis) are reported with category nmosd_related (listed for
+          the reviewer, never ticked); MOGAD, MS or other diagnoses weighed against NMOSD
+          (those belong to the diagnosis check); family history; surgeries and procedures (e.g. cesarean section,
+          bunionectomy); symptoms without a diagnosis; conditions that are only suspected or ruled out
+          (hypothetical=true / negated=true). Benign tumours (e.g. uterine leiomyoma) are not cancer.
+        time_window: Any note. REDCap counts conditions at or after the NMOSD diagnosis; the reviewer checks
+          the timing of any condition that clearly ended before it.
+        ambiguity_rule: 9 (None) only when the note says the patient has no past medical history. Diabetes
+          without a type is 4; type 1 diabetes is 1 (autoimmune). Thyroid disease is 1.
+        estimate_field: null
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: [hypertension, '\bHTN\b', diabet, hyperlipid, cholesterol, depress, anxiety, PTSD,
+                             bipolar, psychosis, schizo, migraine, epilep, seizure, neuropathy, asthma, COPD,
+                             cancer, carcinoma, lymphoma, leukemia, melanoma, malignan, kidney disease, '\bCKD\b',
+                             coronary, '\bCAD\b', myocardial infarction, thyroid, lupus, '\bSLE\b', rheumatoid,
+                             psoriasis, 'Sj[oö]gren', vasculitis, Crohn, colitis, myasthenia]
+        preferred_source: notes
+      autoimmune:
+        status: "draft — needs clinician sign-off"
+        definition: For an autoimmune condition (category 1), which one (1 thyroid diseases, 2 type 1 diabetes,
+          3 systemic lupus erythematosus, 4 rheumatoid arthritis, 5 psoriasis, 6 Sjogren's disease, 7 vasculitis,
+          8 IBD (Crohn's or ulcerative colitis), 9 other, 10 myasthenia gravis).
+        acceptable_evidence: The named condition.
+        exclusions: Leave not_established unless the condition is category 1.
+        time_window: Same as comorbidities.
+        ambiguity_rule: 9 (other) for an autoimmune disease outside codes 1-8 and 10.
+        estimate_field: null
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: []
+        preferred_source: notes
+
+  # Note check of the structured Demographics values below. The structured value stays the proposal; these
+  # mentions are shown to the reviewer as its evidence, and any disagreement with it is flagged.
+  # NOT RUN BY DEFAULT since 16.11.26: every structured field below has `note_check: false` (the demographics come
+  # from the RPDR Demographics table, a standardized database), and `extract` skips a group whose fields are all
+  # structured only. Set `note_check: true` on a field below to check it against the notes again.
+  demographics:
+    instrument: demographics
+    repeating: false
+    relevance: [clinical_note, patient_message]
+    prefilter_keywords: []
+    fields:
+      sex:
+        status: "draft — needs clinician sign-off"
+        definition: Sex assigned at birth as written in the note (1 Male, 2 Female).
+        acceptable_evidence: '"36-year-old woman", "45 yo M", "Sex: Female", "a 52-year-old gentleman".'
+        exclusions: Pronouns or titles alone (she, he, Ms., Mr.); statements about relatives or other people;
+          gender identity statements that do not give sex assigned at birth.
+        time_window: Any note.
+        ambiguity_rule: If the note says sex assigned at birth differs from gender identity, report sex assigned at
+          birth only.
+        estimate_field: null
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: ['\b(?:wo)?man\b', '\b(?:fe)?male\b', 'gentleman', '\blady\b',
+                             '\b\d{1,3}\s*(?:yo|y/o|y\.o\.|-?year-old)\s*[FM]\b', '\bsex\s*:', '\bgender\s*:']
+        preferred_source: structured
+      race:
+        status: "draft — needs clinician sign-off"
+        definition: The patient's race as written in the note (1 White, 2 Black/African American, 3 Native
+          American/American Indian, 4 Asian, Native Hawaiian/Other Pacific Islander, 5 Other).
+        acceptable_evidence: '"45-year-old African American woman", "Race: White", "Caucasian male",
+          "self-identifies as Asian".'
+        exclusions: White or black used for anything other than race (white matter, white blood cells, black
+          stool); Hispanic or Latino (that is ethnicity); language, interpreter use or country of birth alone;
+          relatives' race.
+        time_window: Any note.
+        ambiguity_rule: Use 5 (Other) only when the note names a race outside codes 1-4. If the note gives more
+          than one race, report each in its own item.
+        estimate_field: null
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: ['Caucasian', 'African[- ]American', '\b(?:white|black|asian)\s+(?:wo)?man\b',
+                             '\b(?:white|black|asian)\s+(?:fe)?male\b', '\bAsian\b', 'Native American',
+                             'American Indian', 'Alaska Native', 'Pacific Islander', '\brace\s*:', 'identif(?:y|ies) as']
+        preferred_source: structured
+      # ethnicity is NOT checked against the notes (13.11.26): it comes from the structured Demographics table only.
+      living_deceased:
+        status: "draft — needs clinician sign-off"
+        definition: Whether the patient has died (2 Deceased). Report only explicit statements that the patient
+          died.
+        acceptable_evidence: '"passed away on", "[PATIENT] expired", "time of death", "pronounced dead", "autopsy".'
+        exclusions: Deaths of relatives or other people; risk-of-death or mortality discussions; hospice, comfort
+          care or DNR orders alone; expired prescriptions or insurance. Do not report 1 (Living) just because the
+          patient attended a visit.
+        time_window: Any note.
+        ambiguity_rule: If it is unclear whether the patient or someone else died, report it with certainty low.
+        estimate_field: null
+        instrument: demographics
+        repeating: false
+        prefilter_keywords: ['passed away', '\bdied\b', '\bdeceased\b', '\bexpired\b', '\bdeath\b', 'autopsy',
+                             'pronounced']
+        preferred_source: structured
+
+# Direct structured mappings from the RPDR Demographics table (in the .accdb export). These are the proposals.
+# `note_check: false` (all four since 16.11.26; ethnicity since 13.11.26): taken from the table only, not searched
+# for in the notes, so no note evidence is expected. With `note_check: true` the `demographics` group above
+# searches the notes for the field and flags a disagreement or a value with no note mention.
+# `fallback_column`: used when `source_column` is empty or has a value with no REDCap code (flagged for review).
+# Value maps live in config/redcap/structured_maps.yaml.
+
+  # --------------------------------------------------------------------------------------------------------------
+  # Full codebook coverage (16.11.26). The user asked for every field of the REDCap codebook (1-303). The groups
+  # below list REDCap fields by name (`redcap_fields:`): each field's codebook number, label, field note, branching
+  # logic and codes are put into the model's instructions automatically, so `guidance:` only adds what the codebook
+  # does not say. `extra_items:` are keys that are not REDCap fields. `anchor:` is the date key that places an item
+  # in time (items of one event are merged by it). DRAFTED BY CLAUDE: every group needs clinician sign-off.
+  # --------------------------------------------------------------------------------------------------------------
+  # Hospital admissions. An admission for an NMOSD attack goes to that attack's relapse instance (admission,
+  # dates, ICU, acute treatment, complications, rehab, mRS); any other admission is a non-relapse hospitalization.
+  admission:
+    instrument: non_relapse_hospitalization
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    focus: 10
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note]
+    anchor: nr_admission
+    prefilter_keywords: [admitted, admission, hospitali, 'discharged? (?:home|to)', 'discharge summary', 'hospital course',
+                         inpatient, 'length of stay']
+    guidance: >-
+      One item per hospital ADMISSION (an inpatient stay) that this excerpt describes; not an emergency visit without
+      admission and not a clinic visit. nr_admission and nr_discharge are the admission and discharge dates of that
+      stay. for_attack says whether the stay was for an NMOSD attack (relapse). For an attack, give acute_rx and
+      other_acute_rx (the acute treatment of the attack) and leave the cause keys not_established. For any other
+      admission, give nr_cause and the details REDCap asks for (type of infection, organism, bleeding, other cause).
+      nr_icu: whether the patient needed intensive or critical care during the stay.
+    extra_items:
+      - key: for_attack
+        kind: enum
+        options: {"1": "admitted for an NMOSD attack (relapse)", "0": "admitted for another reason"}
+        description: Was this admission for an NMOSD attack (relapse)?
+    redcap_fields: [nr_admission, nr_discharge, nr_cause, nr_infection_detail, nr_cause_other, nr_organism_cause,
+                    bleeding_detail, nr_icu, acute_rx, other_acute_rx]
+  admission_course:
+    instrument: non_relapse_hospitalization
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    focus: 10
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note]
+    anchor: nr_admission
+    prefilter_keywords: [admitted, admission, hospitali, 'hospital course', inpatient, rehab, complicat, 'mRS',
+                         'modified Rankin']
+    guidance: >-
+      One item per hospital admission that this excerpt describes: what happened DURING the stay. nr_admission is the
+      admission date (it matches the stay). nr_adverse_events are complications that were NOT present on admission.
+      adverse_events and adverse_events_other are side effects of the acute treatment of an NMOSD attack (steroids
+      including prednisone tapers, PLEX, IVIG). nr_rehab and its dates: discharge to inpatient rehabilitation.
+      nr_mrs_adm and nr_mrs_disch: the modified Rankin Scale (0-6) on admission and at discharge, only when the note
+      states it.
+    redcap_fields: [nr_admission, nr_adverse_events, nr_infection_adverse, nr_organism_adverse, nr_adverse_other,
+                    adverse_events, adverse_events_other, nr_rehab, nr_rehab_admit, nr_rehab_discharge, nr_mrs_adm,
+                    nr_mrs_disch]
+  # Hospital names (18.11.26). De-identification replaces them with [HOSPITAL_nn], so this group runs ONLY when the
+  # notes still name hospitals (`needs_hospital_names`): notes kept as they are (`deid.enabled: false` or
+  # `nmosd deid --keep-identifiers`), or `deid.tokenise_hospitals: false`. Otherwise `extract` skips it and the
+  # reviewer enters hx_opcare, nr_hosp and nr_hosp_2 in REDCap. It is a group of its own so that the admission
+  # groups' finished work on the de-identified pilot stays done. A mention never makes an admission of its own: it
+  # names the hospital of a stay the admission groups found (nr_hosp, or nr_hosp_2 for an attack's admission).
+  # hx_opcare is the hospital named most often for outpatient care.
+  hospital:
+    instrument: non_relapse_hospitalization
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    needs_hospital_names: true
+    relevance: [clinical_note]
+    anchor: nr_admission
+    prefilter_keywords: [hospital, 'medical cent(?:er|re)', 'health cent(?:er|re)', infirmary, '\bOSH\b',
+                         'admitted (?:to|at)', 'transferred (?:from|to)', 'follow(?:s|ed|ing)? (?:up )?(?:with|at) ',
+                         'establish(?:ed|ing)? care', 'transfer(?:red|ring)? (?:of )?(?:her |his |their )?care']
+    guidance: >-
+      Hospital NAMES, as two kinds of item. (1) For each hospital ADMISSION (an inpatient stay) this excerpt
+      describes: nr_hosp is the hospital where the patient was admitted, copied as the note writes it (e.g.
+      "Massachusetts General Hospital", "MGH", "an outside hospital"), and nr_admission is the admission date
+      (not_established if the excerpt does not give one). Not emergency visits without admission, clinic visits, or
+      where a test or scan was done. A patient transferred between hospitals during one stay: one item per hospital.
+      (2) Where the patient receives regular OUTPATIENT neurology or NMOSD care, when the excerpt says so ("follows
+      in the MGH Neuroimmunology clinic", "transferred her care to Brigham") or this note is a clinic visit that
+      names its own hospital: one item with hx_opcare = that hospital, and nr_hosp and nr_admission not_established.
+      Copy names exactly; never guess a hospital the excerpt does not name.
+    redcap_fields: [nr_admission, nr_hosp, hx_opcare]
+
+  imaging:
+    instrument: imaging
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [neuro_mri, clinical_note]
+    anchor: date_of_study
+    prefilter_keywords: ['\bMRI\b', '\bMR (?:brain|spine|orbit)', 'magnetic resonance']
+    guidance: >-
+      One item per MRI study (or MRIs done on the same day) that this excerpt reports. date_of_study is the date the
+      MRI was done, which is not the date of a note that only mentions it. mri_type: the regions imaged.
+      did_this_mri_show_radiolog: new or enhancing lesions that fit an attack (1) vs. stable or no new lesions (0).
+      Answer the optic nerve keys only when the orbits were imaged. "None" or "No enhancement" codes only when the
+      report says so; otherwise not_established.
+      An MRI that is normal, stable or shows no new lesion is still a study: report it
+      (did_this_mri_show_radiolog 0).
+    redcap_fields: [date_of_study, mri_type, did_this_mri_show_radiolog, mri_optic_abn, on_location, orbits_features,
+                    orbits_other, orbit_gad, orbit_gad_other]
+  imaging_brain:
+    instrument: imaging
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [neuro_mri]
+    anchor: date_of_study
+    prefilter_keywords: [brain, head, cerebr, periventricular, supratentorial, infratentorial, 'white matter',
+                         'area postrema', thalam, pons, medulla, cerebell]
+    guidance: >-
+      One item per brain MRI that this radiology report describes: new abnormalities in the brain (not the optic
+      nerves), their location and features, and the enhancement pattern. date_of_study is the date of the MRI.
+      Feature codes only for what the report describes; "None of the above" only when it says there are no such
+      lesions.
+    redcap_fields: [date_of_study, mri_brain_abnl, supratentorial, infratentorial, supratentorial_features,
+                    supratentorial_other, infratentorial_details, infratentorial_other, brain_gad, brain_gad_other]
+  imaging_spine:
+    instrument: imaging
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [neuro_mri]
+    anchor: date_of_study
+    prefilter_keywords: [spine, spinal, cord, cervical, thoracic, conus, myelitis, LETM, 'C\d', 'T\d']
+    guidance: >-
+      One item per spine MRI that this radiology report describes: new abnormalities of the cervical and the
+      thoracic cord (or conus), their features and the enhancement pattern. date_of_study is the date of the MRI.
+      Answer the cervical keys only if the cervical spine was imaged and the thoracic keys only if the thoracic
+      spine was.
+    redcap_fields: [date_of_study, mri_c_abn, cervical_features, cervical_other, cervical_gad, cervical_gad_other,
+                    mri_t_abn, thoracic_features, thoracic_other, thoracic_gad, thoracic_gad_other]
+
+  treatment_detail:
+    instrument: treatment
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    focus: 8
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note]
+    prefilter_keywords: [rituximab, rituxan, truxima, ruxience, inebilizumab, uplizna, eculizumab, soliris,
+                         ravulizumab, ultomiris, satralizumab, enspryng, tocilizumab, actemra, mycophenolate,
+                         cellcept, '\bMMF\b', azathioprine, imuran, methotrexate, cyclophosphamide, ocrelizumab,
+                         ofatumumab, natalizumab, interferon, glatiramer]
+    guidance: >-
+      One item per maintenance immunotherapy drug that this excerpt gives details about: its dose (with units), how
+      often it is given, why it was started, added or switched to, and any toxicities while on it.
+      maintenance_therapy is the drug's code. start_reason only when the note gives the reason. maint_tox: problems
+      that occurred while on the drug or that the note puts down to it; 19 only when the note says there were none.
+      Not drugs that are only planned or discussed.
+    extra_items:
+      - key: start_reason
+        kind: enum
+        options: {attack: "a clinical NMOSD attack (the first attack, or one on the previous treatment)",
+                  symptoms: "NMOSD symptoms that are not a clinical attack", toxicity: "toxicity or side effects of the previous treatment",
+                  preference: "patient preference or convenience", cost: "cost or insurance", titration: "planned dose titration",
+                  steroid_sparing: "to come off steroids", pregnancy: "pregnancy planning",
+                  accidental_stop: "the previous course was stopped by accident", other: "another reason"}
+        description: Why this drug was started, added, restarted or switched to, as the note states.
+    redcap_fields: [maintenance_therapy, other_maintenance_tx, maintenance_tx_dosing, maintenance_tx_freq,
+                    other_frequency_detail, maint_tox, detail_toxicities_describe]
+
+  # CD19/CD20 counts, immunoglobulins and the absolute lymphocyte count (the RPDR export has no Lab table).
+  # 18.11.26: infusion and administration records ("Administrations This Visit" tables, an infusion nurse's
+  # "Med: / Frequency: / Dose:" lines) read with text patterns, no model (src/nmosd/extract/admin_records.py). Each
+  # record is one dated mention of the drug with its dose and frequency; Combine merges them into the drug's course.
+  treatment_admin:
+    instrument: treatment
+    repeating: true
+    method: regex
+    relevance: [clinical_note]
+    prefilter_keywords: ['Administrations This Visit', 'Dose\s*:\s*\d']
+    fields: {}
+
+  # 18.11.26: laboratory table rows (immunoglobulins, lymphocyte and CD19/CD20 counts, AQP4 and MOG results) read
+  # with text patterns, no model (src/nmosd/extract/lab_tables.py). Layouts from `nmosd lab-shapes` over the export.
+  labs_table:
+    instrument: cd1920_counts
+    repeating: true
+    method: regex
+    relevance: [clinical_note, flow_cytometry]
+    prefilter_keywords: ['Ig[GAM]\b', 'immunoglobulin [GAM]\b', 'abs(?:olute)?\.? lymph', 'CD ?(?:19|20)', 'NMO',
+                         'AQP-?4', '\bMOG\b']
+    fields: {}
+
+  labs:
+    instrument: cd1920_counts
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    focus: 6
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note, flow_cytometry]
+    anchor: test_date
+    prefilter_keywords: [CD19, CD20, 'B[- ]?cell', '(?<![-\w])IgG\b(?![- ]?(?:index|antibod))', '(?<![-\w])IgM\b',
+                         '(?<![-\w])IgA\b', 'immunoglobulins?,? (?:level|quant|G\b|M\b|A\b)', 'lymphocyte count',
+                         '\bALC\b', 'flow cytometry']
+    guidance: >-
+      One item per laboratory RESULT that this excerpt gives for these tests: CD19 or CD20 B-cell counts (absolute,
+      cells/uL, or % of lymphocytes), serum IgG, IgM or IgA, and the absolute lymphocyte count. value is the number
+      as written, without units; unit is the unit as written. test_date is the date the sample was taken (or the
+      result's date). Not results that are only planned or pending, and not CSF results.
+      CD19 and CD20 are reported both as an absolute count and as a percentage, so never assume which a number is:
+      use cd19_abs / cd20_abs only when the text gives a count (cells/uL, "absolute"), cd19_pct / cd20_pct only
+      when it gives a percentage; for a CD19 or CD20 number with neither a unit nor a heading that says which, use
+      cd19_unspecified / cd20_unspecified. A flow-panel row such as "CD19+CD20-" or "CD19+CD20+" is a subset, not
+      the total: leave it out.
+    extra_items:
+      - key: test
+        kind: enum
+        options: {cd19_abs: "CD19 absolute count", cd19_pct: "CD19 % of lymphocytes", cd20_abs: "CD20 absolute count",
+                  cd20_pct: "CD20 % of lymphocytes", igg: "serum IgG", igm: "serum IgM", iga: "serum IgA",
+                  alc: "absolute lymphocyte count",
+                  cd19_unspecified: "CD19 result that does not say count or percent",
+                  cd20_unspecified: "CD20 result that does not say count or percent"}
+        description: Which test this result is.
+      - key: value
+        kind: text
+        description: The result as written, a number (e.g. "0", "1.2", "<1", "350").
+      - key: unit
+        kind: text
+        description: The unit as written (e.g. "cells/uL", "%", "mg/dL", "g/L", "K/uL"), or "" if none.
+      - key: test_date
+        kind: date
+        description: Date the sample was taken or the result reported.
+    redcap_fields: []
+
+  ivig:
+    instrument: ivig_for_hypogam
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    focus: 6
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note, patient_message]
+    anchor: event_date
+    prefilter_keywords: ['\bIVIG\b', '\bSCIG\b', 'immune globulin', 'immunoglobulin replacement', hizentra, gammagard,
+                         privigen, octagam, gamunex, cuvitru, xembify, hypogammaglobulin]
+    guidance: >-
+      Immunoglobulin REPLACEMENT (IVIG, or subcutaneous SCIG) for low immunoglobulins (hypogammaglobulinemia, often
+      after rituximab) or recurrent infections. IVIG given as the acute treatment of an NMOSD attack is not
+      replacement: report it with for_hypogam 0. One item per mention of a course: event (start, stop, ongoing,
+      planned, considered), its date, the dose and how often (every X weeks).
+    extra_items:
+      - key: for_hypogam
+        kind: enum
+        options: {"1": "replacement for low immunoglobulins or infections", "0": "acute treatment of an attack, or another use"}
+        description: What the immunoglobulin was given for.
+      - key: event
+        kind: event
+      - key: event_date
+        kind: date
+        description: Date of that start, stop or dose.
+    redcap_fields: [ivig_dose, other_dose, frequency]
+
+  infection:
+    instrument: infections_requiring_antibiotics
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    whole_note_under: 4000
+    focus: 6
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note, patient_message]
+    anchor: infection_date
+    prefilter_keywords: [antibiotic, amoxicillin, augmentin, azithromycin, cephalexin, keflex, ciprofloxacin, cipro,
+                         levofloxacin, nitrofurantoin, macrobid, bactrim, doxycycline, cefdinir, ceftriaxone,
+                         clindamycin, vancomycin, '\bUTI\b', pneumonia, cellulitis, sinusitis, bronchitis]
+    guidance: >-
+      One item per infection that this excerpt says was treated with antibiotics, e.g. a UTI treated with
+      nitrofurantoin. infection_date is when its symptoms began (else when it was diagnosed). care_setting is where it
+      was treated. Not prophylactic antibiotics (e.g. penicillin for meningococcal prophylaxis with eculizumab or
+      ravulizumab), infections that were only suspected, or infections not treated with antibiotics.
+    redcap_fields: [infection_date, care_setting, infection_type, infection_other]
+
+  background:
+    instrument: demographics
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    focus: 5
+    repeating: false
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note]
+    skip_repeated_lines: true
+    prefilter_keywords: [insurance, denied, denial, 'prior auth', appeal, paraneoplastic, wheelchair, walker, '\bcane\b',
+                         'baseline', ambulat, mobility]
+    guidance: >-
+      Facts about the patient's background. baseline_mobility is how mobile the patient was BEFORE the first NMOSD
+      symptoms (6 only when the note says it is not known). cancer: whether NMOSD is considered paraneoplastic (only
+      for a patient with cancer). insurance_denial and dmt_denied: whether insurance ever denied an NMOSD maintenance
+      drug, and which. Use not_established for anything the excerpt does not say.
+    redcap_fields: [baseline_mobility, cancer, insurance_denial, dmt_denied]
+
+  death:
+    instrument: demographics
+    # 18.11.26 (reference review of the pilot): how much of a note this group reads; see chunking.select_view
+    focus: 6
+    repeating: false
+    status: "draft — needs clinician sign-off"
+    relevance: [clinical_note]
+    prefilter_keywords: [died, deceased, 'death', expired, 'passed away', autopsy, 'comfort measures', hospice]
+    guidance: >-
+      Only if THE PATIENT has died: the cause of death as the note gives it, and whether the death was related to
+      NMOSD (a complication of the disease, of an NMOSD hospitalization or of its treatment). Not deaths of relatives.
+    redcap_fields: [cause_death, death_nmo]
+
+  # Disability (EDSS): one examination note per maintenance treatment start and stop and the last follow-up
+  # (`select: treatment_timepoints`, src/nmosd/extract/targets.py), split into four groups to keep each answer short.
+  edss_ambulation:
+    instrument: edss
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    select: treatment_timepoints
+    relevance: [clinical_note]
+    prefilter_keywords: [gait, walk, ambulat, wheelchair, '\bcane\b', walker, exam]
+    guidance: &edss_guidance >-
+      This excerpt is a clinical note with a neurological examination. Answer about the patient's state AT THE TIME
+      OF THIS NOTE, following REDCap's step-by-step questions: answer the first question of each system, then only
+      the follow-up questions REDCap would ask next ("REDCap asks this only if ..."). Codebook notes such as "If
+      unsure, mark 'Yes' to answer additional questions" apply. Use not_established for a question the note gives
+      no information on. Return ONE item for this note.
+    redcap_fields: [cat_gait, is_the_patient_wheelchair, can_the_patient_get_out_of, what_is_their_functional_a,
+                    can_the_use_their_arms, can_communicate_and_or_eat, ambulation_distance_report, distance_assistance,
+                    assistance_required, what_type_of_assistance_is, restricted_ambulation, level_of_restricted_ambula,
+                    mild_gait_difficulties, mrs]
+  edss_vision_brainstem:
+    instrument: edss
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    select: treatment_timepoints
+    relevance: [clinical_note]
+    prefilter_keywords: [vision, visual, acuity, '20/', diplopia, nystagmus, 'cranial nerve', '\bCN', dysarthria,
+                         dysphagia, exam]
+    guidance: *edss_guidance
+    redcap_fields: [cat_vision, va_avail, worseeye_full, bettereye_full, vfs, visual_sx_nova, visual_sx, cat_bs,
+                    brain_stem_step_1, brain_stem_step_2, brain_stem_step_3, brain_stem_step_4]
+  edss_pyramidal_cerebellar:
+    instrument: edss
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    select: treatment_timepoints
+    relevance: [clinical_note]
+    prefilter_keywords: [strength, weakness, motor, reflex, spastic, drift, ataxi, romberg, dysmetria, tremor,
+                         'finger[- ]to[- ]nose', 'heel[- ]to[- ]shin', exam]
+    guidance: *edss_guidance
+    redcap_fields: [pyramidal_step_1, bmrc, pyramidal_step_2, pyramidal_step_3, cat_cere, cerebellar_step_1,
+                    cerebellar_step_2, cerebellar_step_25, cerebellar_step_3]
+  edss_sensory_bowel_cerebral:
+    instrument: edss
+    repeating: true
+    status: "draft — needs clinician sign-off"
+    select: treatment_timepoints
+    relevance: [clinical_note]
+    prefilter_keywords: [sensory, sensation, numb, tingling, paresthes, vibration, proprioception, bladder, bowel,
+                         urinary, catheter, incontinen, cognit, memory, fatigue, exam]
+    guidance: *edss_guidance
+    redcap_fields: [cat_sens, worst_sensory_fs, superficial_sensation, position, vibration, cat_bb, bb_step1, bb_step2,
+                    bb_original_5, bb_original_4, bb_original_3, bb_original_2, bb_original_1, cerebral_step_1,
+                    level_cog, fatigue]
+
+  # Weight and height from the vitals lines: text patterns, no model (src/nmosd/extract/vitals.py).
+  # 18.11.26: dated header and list lines read with text patterns, no model (src/nmosd/extract/note_facts.py).
+  # dx_dates: the problem-list / visit-diagnosis row naming NMOSD with its date (a fallback for the diagnosis date).
+  dx_dates:
+    instrument: demographics
+    repeating: false
+    method: regex
+    relevance: [clinical_note]
+    prefilter_keywords: ['neuromyelitis optica\s{2,}', 'NMOSD\s{2,}']
+    fields: {}
+
+  # admission_dates: "Admit date:" / "Discharge date:" at the top of a discharge summary.
+  admission_dates:
+    instrument: non_relapse_hospitalization
+    repeating: true
+    method: regex
+    relevance: [clinical_note]
+    prefilter_keywords: ['Admi(?:t|tted|ssion)(?: date)?\s*:', 'Discharged?(?: date)?\s*:']
+    fields: {}
+
+  vitals:
+    instrument: demographics
+    repeating: false
+    method: regex
+    reader_version: 2   # 18.11.26: "WEIGHT(lbs)  150 lbs"
+    relevance: [clinical_note]
+    prefilter_keywords: ['\bwt\b', weight, '\bht\b', height]
+    fields: {}
+
+
+structured:
+  sex:
+    status: "draft — needs clinician sign-off"
+    source_column: Sex_At_Birth
+    fallback_column: Gender_Legal_Sex
+    preferred_source: structured
+    note_check: false   # structured value only (16.11.26)
+    instrument: demographics
+  race:
+    status: "draft — needs clinician sign-off"
+    source_column: Race1
+    fallback_column: Race_Group
+    preferred_source: structured
+    note_check: false   # structured value only (16.11.26)
+    instrument: demographics
+  ethnicity:
+    status: "draft — needs clinician sign-off"
+    source_column: Ethnic_Group
+    preferred_source: structured
+    note_check: false   # structured value only, not searched for in the notes (13.11.26; STRUCTURED_ONLY in code)
+    instrument: demographics
+    check: "Only one distinct value across all 32 real patients — confirm before trusting."
+  living_deceased:
+    status: "draft — needs clinician sign-off"
+    source_column: Vital_status
+    also_uses: Date_Of_Death
+    preferred_source: structured
+    note_check: false   # structured value only (16.11.26)
+    instrument: demographics

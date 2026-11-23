@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nmosd-extractor"
+version = "0.1.0"
+description = "Neurology REDCap Extractor: local-LLM extraction of REDCap fields from RPDR notes, with clinician review (NMOSD first)."
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "pyyaml>=6",
+    "pydantic>=2.6",
+    "ollama>=0.4",
+    "cryptography>=42",
+]
+
+[project.optional-dependencies]
+# Windows: Access via the Microsoft Access Database Engine ODBC driver.
+windows = ["pyodbc>=5"]
+# Transformer de-identification ensemble (OBI + Stanford AIMI). CPU is fine.
+ner = ["transformers>=4.40", "torch>=2.2"]
+# Clinician review UI.
+review = ["streamlit>=1.35"]
+# The guided app (`nmosd app`): review UI, background jobs, OS certificate store for the one-time downloads.
+app = ["streamlit>=1.40", "psutil>=5.9", "truststore>=0.9"]
+# The app in its own window (`nmosd app --window`): WebKit on a Mac, Edge WebView2 on Windows. Without it the app
+# opens in an Edge/Chrome app window, or else the browser.
+window = ["pywebview>=5.3"]
+# Benchmark peak-RAM measurement.
+bench = ["psutil>=5.9"]
+dev = ["pytest>=8", "ruff>=0.6", "psutil>=5.9"]
+
+[project.scripts]
+nmosd = "nmosd.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"nmosd" = ["store/*.sql", "extract/prompts/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-q"
+markers = [
+    "ollama: needs a local Ollama server on 127.0.0.1 with a pulled model (skipped otherwise)",
+    "ner: needs the transformer de-identification models downloaded (skipped otherwise)",
+    "streamlit: needs streamlit installed (skipped otherwise)",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+# The user's original metadata-only inspectors are kept as written.
+extend-exclude = ["scripts/inspect_accdb.py", "scripts/profile_notes.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "SIM108", "B008"]
